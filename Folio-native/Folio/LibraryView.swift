@@ -89,15 +89,15 @@ struct LibraryView: View {
             .disabled(!store.isLoaded)
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            Button { graphVisible = true } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }.accessibilityLabel("Knowledge map")
+            Button { graphVisible = true } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }.accessibilityLabel("Knowledge map").disabled(!store.isLoaded)
             Menu {
                 Button("Import from Files", systemImage: "square.and.arrow.down") { importVisible = true }
                 Button("Back up whole library", systemImage: "externaldrive") { Task { await store.export() } }
                 Button("New folder", systemImage: "folder.badge.plus") { promptText = ""; folderPrompt = true }
                 if store.isSaving { Button("Retry saving", systemImage: "arrow.clockwise") { Task { _ = await store.flush() } } }
-            } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("Library actions")
-            Button { newVisible = true } label: { Label("New notebook", systemImage: "plus") }.accessibilityIdentifier("new-notebook")
-        }.disabled(!store.isLoaded)
+            } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("Library actions").disabled(!store.isLoaded)
+            Button { newVisible = true } label: { Label("New notebook", systemImage: "plus") }.accessibilityIdentifier("new-notebook").disabled(!store.isLoaded)
+        }
     }
 
     private func openLibraryURL(_ url: URL) {
