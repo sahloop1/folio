@@ -41,33 +41,7 @@ struct LibraryView: View {
             }
             .background(FolioStyle.background)
             .navigationTitle("Folio")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        ForEach(store.profiles, id: \.self) { name in
-                            let icon = name == store.profile ? "checkmark" : "person"
-                            Button {
-                                store.selectProfile(name)
-                                folder = ""
-                            } label: {
-                                Label(name, systemImage: icon)
-                            }
-                        }
-                        Divider(); Button("New profile", systemImage: "person.badge.plus") { promptText = ""; profilePrompt = true }
-                    } label: { Label(store.profile, systemImage: "person.crop.circle") }
-                    .disabled(!store.isLoaded)
-                }
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button { graphVisible = true } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }.accessibilityLabel("Knowledge map")
-                    Menu {
-                        Button("Import from Files", systemImage: "square.and.arrow.down") { importVisible = true }
-                        Button("Back up whole library", systemImage: "externaldrive") { Task { await store.export() } }
-                        Button("New folder", systemImage: "folder.badge.plus") { promptText = ""; folderPrompt = true }
-                        if store.isSaving { Button("Retry saving", systemImage: "arrow.clockwise") { Task { _ = await store.flush() } } }
-                    } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("Library actions")
-                    Button { newVisible = true } label: { Label("New notebook", systemImage: "plus") }.accessibilityIdentifier("new-notebook")
-                }.disabled(!store.isLoaded)
-            }
+            .toolbar { libraryToolbar }
             .searchable(text: $search, prompt: "Search titles, tags, sections, and typed notes")
             .navigationDestination(for: String.self) { id in NotebookDesk(mainID: id) }
             .fileImporter(isPresented: $importVisible, allowedContentTypes: [.folioNotebook, .zip, .pdf, .plainText, .data], allowsMultipleSelection: false) { result in
@@ -93,14 +67,52 @@ struct LibraryView: View {
                 Button("Delete notebook", role: .destructive) { if let notebook = deleting { Task { await store.purge(notebook.id) } }; deleting = nil }
             } message: { Text("Export a backup first if you may need it again.") }
             .onChange(of: store.profile) { _, _ in folder = "" }
-            .onOpenURL { url in
-                if url.isFileURL { Task { await store.prepareImport(url, folder: folder) } }
-                else if url.scheme == "folio", url.host == "notebook", let notebook = store.notebook(String(url.path.dropFirst())), !notebook.trashed {
-                    store.selectProfile(notebook.profile); path = [notebook.id]
-                }
-            }
+            .onOpenURL { url in openLibraryURL(url) }
         }
     }
+
+    @ToolbarContentBuilder
+    private var libraryToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Menu {
+                ForEach(store.profiles, id: \.self) { name in
+                    let icon = name == store.profile ? "checkmark" : "person"
+                    Button {
+                        store.selectProfile(name)
+                        folder = ""
+                    } label: {
+                        Label(name, systemImage: icon)
+                    }
+                }
+                Divider(); Button("New profile", systemImage: "person.badge.plus") { promptText = ""; profilePrompt = true }
+            } label: { Label(store.profile, systemImage: "person.crop.circle") }
+            .disabled(!store.isLoaded)
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button { graphVisible = true } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }.accessibilityLabel("Knowledge map")
+            Menu {
+                Button("Import from Files", systemImage: "square.and.arrow.down") { importVisible = true }
+                Button("Back up whole library", systemImage: "externaldrive") { Task { await store.export() } }
+                Button("New folder", systemImage: "folder.badge.plus") { promptText = ""; folderPrompt = true }
+                if store.isSaving { Button("Retry saving", systemImage: "arrow.clockwise") { Task { _ = await store.flush() } } }
+            } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("Library actions")
+            Button { newVisible = true } label: { Label("New notebook", systemImage: "plus") }.accessibilityIdentifier("new-notebook")
+        }.disabled(!store.isLoaded)
+    }
+
+    private func openLibraryURL(_ url: URL) {
+        if url.isFileURL {
+            Task { await store.prepareImport(url, folder: folder) }
+            return
+        }
+
+        guard url.scheme == "folio", url.host == "notebook" else { return }
+        let notebookID = String(url.path.dropFirst())
+        guard let notebook = store.notebook(notebookID), !notebook.trashed else { return }
+        store.selectProfile(notebook.profile)
+        path = [notebook.id]
+    }
+
     private var library: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
