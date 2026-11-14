@@ -8,7 +8,9 @@ struct PageBrowser: View {
     let bookID: String
     let selectedID: String
     let onSelect: (String) -> Void
-    @State private var search = "", sectionTitle = "", parentID = ""
+    @State private var search = ""
+    @State private var sectionTitle = ""
+    @State private var parentID = ""
     @State private var removing: String?
 
     var body: some View {
@@ -96,7 +98,8 @@ struct PageSettings: View {
     @Environment(\.dismiss) private var dismiss
     let bookID: String
     let pageID: String
-    @State private var title = "", paper = Paper.ruled
+    @State private var title = ""
+    @State private var paper = Paper.ruled
     @State private var lines = 32
     @State private var length: Double = 1
     @State private var paperColor: Double = -329745
@@ -172,7 +175,8 @@ struct PageLabels: View {
     let bookID: String
     let pageID: String
     @State private var labels: [[String: JSONValue]] = []
-    @State private var text = "", link = ""
+    @State private var text = ""
+    @State private var link = ""
     @State private var localError: String?
     var body: some View {
         NavigationStack {

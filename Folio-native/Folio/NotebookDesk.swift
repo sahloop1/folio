@@ -101,7 +101,9 @@ private struct NotebookEditor: View {
     @StateObject private var actions = CanvasActions()
     @State private var pageID = ""
     @State private var settings = CanvasSettings()
-    @State private var contentsVisible = false, settingsVisible = false, labelsVisible = false
+    @State private var contentsVisible = false
+    @State private var settingsVisible = false
+    @State private var labelsVisible = false
 
     var body: some View {
         if let notebook = store.notebook(bookID), let page = notebook.pages.first(where: { $0.id == pageID }) ?? notebook.pages.first {

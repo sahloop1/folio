@@ -7,9 +7,16 @@ struct LibraryView: View {
     @EnvironmentObject var store: LibraryStore
     @EnvironmentObject var audio: AudioController
     @State private var path: [String] = []
-    @State private var search = "", folder = "", filter = "All materials", sort = "Last edited"
-    @State private var importVisible = false, newVisible = false, graphVisible = false
-    @State private var profilePrompt = false, folderPrompt = false, promptText = ""
+    @State private var search = ""
+    @State private var folder = ""
+    @State private var filter = "All materials"
+    @State private var sort = "Last edited"
+    @State private var importVisible = false
+    @State private var newVisible = false
+    @State private var graphVisible = false
+    @State private var profilePrompt = false
+    @State private var folderPrompt = false
+    @State private var promptText = ""
     @State private var editing: Notebook?
     @State private var deleting: Notebook?
     private var filtered: [Notebook] {
