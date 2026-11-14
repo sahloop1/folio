@@ -1,0 +1,47 @@
+# Native Folio builds on a hosted Mac. The check workflow needs no Apple account.
+# For the signed workflow, configure an Apple integration named exactly "Folio"
+# and add a matching Apple Distribution certificate and App Store profile.
+workflows:
+  folio-native-check:
+    name: Folio - compile and test first
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      xcode: latest
+    scripts:
+      - name: Check native app on iPad Simulator and compile for iPad
+        script: bash Folio-native/scripts/build-macos.sh check
+    artifacts:
+      - Folio-native/build/*.xcresult
+      - /tmp/xcodebuild_logs/*.log
+
+  folio-testflight:
+    name: Folio - signed build for private TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: Folio
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: net.sahlab.folio
+    scripts:
+      - name: Run native checks before preparing a release
+        script: bash Folio-native/scripts/build-macos.sh check
+      - name: Assign an increasing Apple build number
+        script: python3 Folio-native/scripts/cloud-build-number.py "$BUILD_NUMBER"
+      - name: Apply configured distribution profile
+        script: xcode-project use-profiles --project Folio-native/Folio.xcodeproj
+      - name: Archive and export the signed iPad app
+        script: xcode-project build-ipa --project Folio-native/Folio.xcodeproj --scheme Folio
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - Folio-native/build/*.xcresult
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Upload privately. Assign yourself to an internal group in Apple's UI.
+        submit_to_testflight: false
+        submit_to_app_store: false
