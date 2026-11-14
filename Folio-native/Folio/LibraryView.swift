@@ -44,7 +44,15 @@ struct LibraryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
-                        ForEach(store.profiles, id: \.self) { name in Button(name, systemImage: name == store.profile ? "checkmark" : "person") { store.selectProfile(name); folder = "" } }
+                        ForEach(store.profiles, id: \.self) { name in
+                            let icon = name == store.profile ? "checkmark" : "person"
+                            Button {
+                                store.selectProfile(name)
+                                folder = ""
+                            } label: {
+                                Label(name, systemImage: icon)
+                            }
+                        }
                         Divider(); Button("New profile", systemImage: "person.badge.plus") { promptText = ""; profilePrompt = true }
                     } label: { Label(store.profile, systemImage: "person.crop.circle") }
                     .disabled(!store.isLoaded)
