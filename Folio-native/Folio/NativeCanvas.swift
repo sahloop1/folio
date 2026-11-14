@@ -66,6 +66,7 @@ final class NativeCanvasController: UIViewController, UIScrollViewDelegate, PKCa
     private let paperView: PaperSurface
     private var page: Page
     private var sentInk: Data?
+    private var committedDrawing = PKDrawing()
     private var applying = false, fitted = false
     private var pending: DispatchWorkItem?
     private var linkButtons: [UIButton] = []
@@ -118,7 +119,11 @@ final class NativeCanvasController: UIViewController, UIScrollViewDelegate, PKCa
         if oldSettings != settings || changed { applySettings() }
     }
     private func applyDrawing() {
-        applying = true; canvas.drawing = InkBridge.drawing(for: page); sentInk = page.pencilData; applying = false
+        applying = true
+        canvas.drawing = InkBridge.drawing(for: page)
+        committedDrawing = canvas.drawing
+        sentInk = page.pencilData
+        applying = false
     }
     private func configureSurface() {
         // Reset transform while updating unscaled paper geometry, then restore the shared native zoom.
@@ -133,6 +138,7 @@ final class NativeCanvasController: UIViewController, UIScrollViewDelegate, PKCa
             textView.attributedText = NSAttributedString(string: body.text("text"), attributes: PaperRenderer.attributes(body))
             textView.selectedRange = NSRange(location: min(selection.location, (textView.text as NSString).length), length: 0)
         }
+        textView.accessibilityValue = body.text("text")
         textView.typingAttributes = PaperRenderer.attributes(body)
         textView.frame = CGRect(x: body.number("x", 80), y: body.number("y", 100),
                                 width: body.number("width", page.width - 160), height: max(100, page.height - body.number("y", 100) - 60))
@@ -197,14 +203,28 @@ final class NativeCanvasController: UIViewController, UIScrollViewDelegate, PKCa
     func commitCurrent() {
         pending?.cancel(); pending = nil
         guard isViewLoaded, !applying else { return }
-        let data = canvas.drawing.dataRepresentation()
-        guard data != sentInk else { return }
-        InkBridge.save(canvas.drawing, to: &page); sentInk = page.pencilData
-        onChange?(page)
+        let textChanged = updatePageText()
+        let drawing = canvas.drawing
+        let inkChanged = drawing != committedDrawing
+        if inkChanged {
+            InkBridge.save(drawing, to: &page)
+            committedDrawing = drawing
+            sentInk = page.pencilData
+        }
+        if textChanged || inkChanged { onChange?(page) }
     }
     func textViewDidChange(_ textView: UITextView) {
+        if updatePageText() { onChange?(page) }
+    }
+    func textViewDidEndEditing(_ textView: UITextView) {
+        if updatePageText() { onChange?(page) }
+    }
+    private func updatePageText() -> Bool {
+        let text = textView.text ?? ""
         var body = page.body.isEmpty ? page.newBody() : page.body
-        body["text"] = .string(textView.text); page.body = body
+        guard text != body.text("text") else { return false }
+        body["text"] = .string(text); page.body = body
+        textView.accessibilityValue = text
         // Expand plain paper within its supported size; reject an overfull edit without truncating it.
         let bottom = PaperRenderer.textRect(body, page: page).maxY + 70
         if bottom > page.height {
@@ -217,7 +237,7 @@ final class NativeCanvasController: UIViewController, UIScrollViewDelegate, PKCa
                 textView.isScrollEnabled = true
             }
         }
-        onChange?(page)
+        return true
     }
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
         guard let current = textView.text, range.location <= (current as NSString).length,

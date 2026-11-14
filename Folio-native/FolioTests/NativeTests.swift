@@ -10,16 +10,41 @@ final class NativeTests: XCTestCase {
         try XCTUnwrap(Bundle(for: Self.self).url(forResource: name, withExtension: nil, subdirectory: "Fixtures"))
     }
     @MainActor
-    func testAndroidInkBecomesEditablePencilKitAndSurvivesReload() throws {
+    func testAndroidInkBecomesEditablePencilKitAndSurvivesReload() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
         let data = try Data(contentsOf: fixture("android-notebook.folio"))
-        var page = try XCTUnwrap(LibraryArchive.prepare(data).notebooks.first?.pages.first)
+        var imported = try LibraryArchive.prepare(data)
+        var notebook = try XCTUnwrap(imported.notebooks.first)
+        var page = try XCTUnwrap(notebook.pages.first)
         let drawing = InkBridge.drawing(for: page)
+        let originalStroke = try XCTUnwrap(drawing.strokes.first)
         XCTAssertEqual(drawing.strokes.count, 1)
         InkBridge.save(drawing, to: &page)
         let native = try XCTUnwrap(page.pencilData)
-        XCTAssertEqual(try PKDrawing(data: native).strokes.count, 1)
-        XCTAssertEqual(InkBridge.drawing(for: page).dataRepresentation(), native)
-        XCTAssertFalse(page.strokes[0].list("points").isEmpty)
+        notebook.pages[0] = page
+        imported.notebooks[0] = notebook
+        let storage = LibraryStorage(root: directory)
+        _ = try await storage.load()
+        _ = try await storage.add(imported, usePreferences: false)
+
+        let reloaded = try await LibraryStorage(root: directory).load()
+        let savedPage = try XCTUnwrap(reloaded.notebooks.first?.pages.first)
+        XCTAssertEqual(savedPage.pencilData, native)
+        let decoded = try PKDrawing(data: XCTUnwrap(savedPage.pencilData))
+        XCTAssertEqual(decoded.strokes.count, 1)
+        let restoredDrawing = InkBridge.drawing(for: savedPage)
+        XCTAssertEqual(restoredDrawing.strokes.count, 1)
+        let restoredStroke = try XCTUnwrap(restoredDrawing.strokes.first)
+        XCTAssertEqual(restoredStroke.ink.inkType, originalStroke.ink.inkType)
+        XCTAssertEqual(restoredStroke.path.count, originalStroke.path.count)
+        for (restored, original) in zip(restoredStroke.path, originalStroke.path) {
+            XCTAssertEqual(restored.location.x, original.location.x, accuracy: 0.1)
+            XCTAssertEqual(restored.location.y, original.location.y, accuracy: 0.1)
+            XCTAssertEqual(restored.force, original.force, accuracy: 0.01)
+        }
+        let portableStroke = try XCTUnwrap(savedPage.strokes.first)
+        XCTAssertFalse(portableStroke.list("points").isEmpty)
     }
     @MainActor
     func testPartialEraserDoesNotResurrectInkInAndroidExport() {

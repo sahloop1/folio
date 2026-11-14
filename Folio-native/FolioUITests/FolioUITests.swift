@@ -18,7 +18,10 @@ final class FolioUITests: XCTestCase {
         typing.tap()
         let pageText = app.textViews["page-text"]
         XCTAssertTrue(pageText.waitForExistence(timeout: 10))
-        pageText.tap(); pageText.typeText("An offline note that survives relaunch.")
+        let note = "An offline note that survives relaunch."
+        pageText.tap()
+        pageText.typeText(note)
+        XCTAssertEqual(pageText.value as? String, note, "The editor should contain the complete note before relaunch.")
         typing.tap()
         // Backgrounding exercises the app's explicit final-save path.
         XCUIDevice.shared.press(.home)
@@ -32,7 +35,7 @@ final class FolioUITests: XCTestCase {
         XCTAssertTrue(app.buttons["toggle-typing"].waitForExistence(timeout: 10))
         app.buttons["toggle-typing"].tap()
         XCTAssertTrue(pageText.waitForExistence(timeout: 10))
-        XCTAssertTrue((pageText.value as? String ?? "").contains("survives relaunch"))
+        XCTAssertEqual(pageText.value as? String, note, "The reopened notebook should contain the complete saved note.")
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Native Folio on iPad Simulator"; screenshot.lifetime = .keepAlways
         add(screenshot)
