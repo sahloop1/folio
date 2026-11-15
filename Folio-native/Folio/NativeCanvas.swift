@@ -44,10 +44,10 @@ struct NativeCanvas: UIViewControllerRepresentable {
 }
 
 private final class PencilCanvas: PKCanvasView {
-    var typing = false, acceptsFinger = false
+    var acceptsFinger = false
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        // Finger text selection/links go to native views below ink. Pencil stays on PencilKit.
-        if let touch = event?.allTouches?.first, touch.type != .pencil, typing || !acceptsFinger { return nil }
+        // Route finger taps to links below the ink unless finger drawing is enabled.
+        if let touch = event?.allTouches?.first, touch.type != .pencil, !acceptsFinger { return nil }
         return super.hitTest(point, with: event)
     }
 }
@@ -164,13 +164,17 @@ final class NativeCanvasController: UIViewController, UIScrollViewDelegate, PKCa
     }
     private func applySettings() {
         let pencil = canvas as! PencilCanvas
-        pencil.typing = settings.typing; pencil.acceptsFinger = settings.fingerDrawing && !settings.typing
+        pencil.acceptsFinger = settings.fingerDrawing && !settings.typing
         canvas.drawingPolicy = pencil.acceptsFinger ? .anyInput : .pencilOnly
+        canvas.isUserInteractionEnabled = !settings.typing
         scroll.panGestureRecognizer.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         scroll.panGestureRecognizer.minimumNumberOfTouches = pencil.acceptsFinger ? 2 : 1
         textView.isEditable = settings.typing; textView.isSelectable = settings.typing; textView.isUserInteractionEnabled = settings.typing
-        if settings.typing { toolPicker.setVisible(false, forFirstResponder: canvas); textView.becomeFirstResponder() }
-        else if settings.showTools {
+        if settings.typing {
+            toolPicker.setVisible(false, forFirstResponder: canvas)
+            canvas.resignFirstResponder()
+            textView.becomeFirstResponder()
+        } else if settings.showTools {
             textView.resignFirstResponder()
             toolPicker.setVisible(true, forFirstResponder: canvas)
             canvas.becomeFirstResponder()
@@ -240,10 +244,11 @@ final class NativeCanvasController: UIViewController, UIScrollViewDelegate, PKCa
         return true
     }
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-        guard let current = textView.text, range.location <= (current as NSString).length,
-              NSMaxRange(range) <= (current as NSString).length else { return false }
+        let current = (textView.text ?? "") as NSString
+        guard range.location >= 0, range.location <= current.length,
+              range.length >= 0, range.length <= current.length - range.location else { return false }
         var body = page.body.isEmpty ? page.newBody() : page.body
-        body["text"] = .string((current as NSString).replacingCharacters(in: range, with: text))
+        body["text"] = .string(current.replacingCharacters(in: range, with: text))
         let maximum = page.pdf.isEmpty ? min(10_000, page.baseHeight * 1.5) : page.height
         guard PaperRenderer.textRect(body, page: page).maxY + 70 <= maximum else {
             onError?("This text would extend past the page. Add a new page or shorten the text; the current text has been kept.")

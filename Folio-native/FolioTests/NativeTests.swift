@@ -96,6 +96,14 @@ final class NativeTests: XCTestCase {
         XCTAssertFalse(reopened.isSaving)
     }
     @MainActor
+    func testFirstInsertionOnBlankPageIsAllowed() {
+        let controller = NativeCanvasController(page: Page(), assetRoot: root())
+        controller.loadViewIfNeeded()
+        let textView = UITextView()
+        textView.text = nil
+        XCTAssertTrue(controller.textView(textView, shouldChangeTextIn: NSRange(location: 0, length: 0), replacementText: "First note"))
+    }
+    @MainActor
     func testOverfullPasteIsRejectedBeforeReplacingExistingText() {
         let page = Page()
         let controller = NativeCanvasController(page: page, assetRoot: root())
